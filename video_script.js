@@ -30,9 +30,7 @@ window.fetch = async function (resource, options) {
                 }
             }
             if (!locked) {
-                console.log("有表情");
                 const json1 = JSON.parse(responseText);
-                console.log(json1);
 
                 let upEmo = buildData(emojis);
                 json1.data.packages.splice(4, 0, upEmo);
