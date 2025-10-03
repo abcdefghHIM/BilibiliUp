@@ -1,8 +1,8 @@
 /*
 请求充电表情
-https://api.bilibili.com/x/upowerv2/gw/rights/guide?build=0&csrf=0249587cafb562cadb37b31cab0ed069&up_mid=目标up_uid
+https://api.bilibili.com/x/upowerv2/gw/rights/guide?build=0&csrf=你的bilibili_tick&up_mid=目标up_uid
 请求表情
-https://api.live.bilibili.com/xlive/web-ucenter/v2/emoticon/GetEmoticons?platform=pc&room_id=24973465
+https://api.live.bilibili.com/xlive/web-ucenter/v2/emoticon/GetEmoticons?platform=pc&room_id=直播间id
 房间数据
 window.__NEPTUNE_IS_MY_WAIFU__
 */
