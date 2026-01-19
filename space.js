@@ -1,8 +1,3 @@
-/*
-https://api.bilibili.com/x/emote/user/panel/web?business=reply
- */
-
-
 function loadScript(url) {
     return new Promise((resolve, reject) => {
         var s = document.createElement('script');

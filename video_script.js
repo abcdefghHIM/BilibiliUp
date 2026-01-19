@@ -9,37 +9,11 @@ window.fetch = async function (resource, options) {
     if (resource.includes("api.bilibili.com/x/emote/user/panel/web")) {
         const active = document.activeElement;
         if (active.tagName === "BILI-COMMENTS") {
-            window.injectVariable = document.querySelector("a.up-avatar").href.split('/')[3];
-            let mid = window.injectVariable;
-            const data = await loadExtraData(mid);
-            if (data.data != null) {
-                let locked = true;
-                let emojis = [];
-                for (const right of data.data.rights) {
-                    //遍历权利列表
-                    for (const right1 of right.right_list) {
-                        //检查有没有解锁
-                        if (right1.right_type == "medal") {
-                            if (locked) {
-                                locked = right1.locked;
-                            }
-                        }
-                        //表情
-                        else if (right1.right_type == "emote") {
-                            emojis = right1.list;
-                        }
-                    }
-                }
-                if (!locked) {
-                    const json1 = JSON.parse(responseText);
-
-                    let upEmo = buildData(emojis);
-                    json1.data.packages.splice(4, 0, upEmo);
-
-                    responseText = JSON.stringify(json1);
-                }
+            if (window.preloadCommEmoji) {
+                const json1 = JSON.parse(responseText);
+                json1.data.packages.splice(4, 0, window.preloadCommEmoji);
+                responseText = JSON.stringify(json1);
             }
-
         }
     }
 
@@ -49,6 +23,32 @@ window.fetch = async function (resource, options) {
         headers: response.headers
     });
 };
+
+(async function () {
+    const data = await loadExtraData(document.querySelector("a.up-avatar").href.split('/')[3]);
+    if (data.data != null) {
+        let locked = true;
+        let emojis = [];
+        for (const right of data.data.rights) {
+            //遍历权利列表
+            for (const right1 of right.right_list) {
+                //检查有没有解锁
+                if (right1.right_type == "medal") {
+                    if (locked) {
+                        locked = right1.locked;
+                    }
+                }
+                //表情
+                else if (right1.right_type == "emote") {
+                    emojis = right1.list;
+                }
+            }
+        }
+        if (!locked) {
+            window.preloadCommEmoji = buildData(emojis)
+        }
+    }
+})();
 
 function buildData(emos) {
     let emo = {};
@@ -104,9 +104,7 @@ async function loadExtraData(mid) {
                 credentials: "include"
             }
         );
-
         const data = await resp.clone().json();
-
         return data;
     } catch (err) {
         console.error("加载额外数据失败:", err);

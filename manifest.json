@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Bilibili Emoji",
-    "version": "1.2",
+    "version": "1.2.1",
     "description": "哔哩哔哩充电表情包",
     "icons": {
         "16": "icons/icon16.png",
@@ -41,8 +41,7 @@
     "web_accessible_resources": [
         {
             "resources": [
-                "live_script.js",
-                "ajaxhook.min.js"
+                "live_script.js"
             ],
             "matches": [
                 "https://live.bilibili.com/*"

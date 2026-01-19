@@ -11,29 +11,11 @@ window.fetch = async function (resource, options) {
     if (resource.includes("api.bilibili.com/x/emote/user/panel/web")) {
         const active = document.activeElement;
         if (active.tagName === "BILI-COMMENTS") {
-            let mid = window.injectVariable;
-            const data = window.preloadJson;
-            let locked = true;
-            let emojis = [];
-            for (const right of data.data.rights) {
-                //遍历权利列表
-                for (const right1 of right.right_list) {
-                    //检查有没有解锁
-                    if (right1.right_type == "medal") {
-                        if (locked) {
-                            locked = right1.locked;
-                        }
-                    }
-                    //表情
-                    else if (right1.right_type == "emote") {
-                        emojis = right1.list;
-                    }
-                }
-            }
-            if (!locked) {
+
+            if (window.preloadCommEmoji) {
                 const json1 = JSON.parse(responseText);
-                let upEmo = buildCommData(emojis);
-                json1.data.packages.splice(4, 0, upEmo);
+                console.warn(json1)
+                json1.data.packages.splice(4, 0, window.preloadCommEmoji);
 
                 responseText = JSON.stringify(json1);
             }
@@ -48,7 +30,6 @@ window.fetch = async function (resource, options) {
 };
 
 (function () {
-    let extraDataCache = null;
 
     function preloadExtraData() {
         let bili_jct = (document.cookie.match(/bili_jct=([^;]+)/) || [])[1] || "";
@@ -60,13 +41,37 @@ window.fetch = async function (resource, options) {
         }).then(resp => resp.clone().json())
             .then(data => {
                 window.preloadJson = data;
+
+                if (data.data != null) {
+                    let locked = true;
+                    let emojis = [];
+                    for (const right of data.data.rights) {
+                        //遍历权利列表
+                        for (const right1 of right.right_list) {
+                            //检查有没有解锁
+                            if (right1.right_type == "medal") {
+                                if (locked) {
+                                    locked = right1.locked;
+                                }
+                            }
+                            //表情
+                            else if (right1.right_type == "emote") {
+                                emojis = right1.list;
+                            }
+                        }
+                    }
+                    if (!locked) {
+                        window.preloadEmoji = buildData(emojis);
+                        window.preloadCommEmoji = buildCommData(emojis);
+                    }
+                }
             });
     }
 
-    window.preloadPromise = preloadExtraData();
+    preloadExtraData();
 })();
 
-function buildData(emos, perm) {
+function buildData(emos) {
     let emo = {};
     emo.current_cover = emos[0].icon;
     emo.pkg_descript = "充电表情";
@@ -97,7 +102,7 @@ function buildData(emos, perm) {
         e.emoticon_value_type = 1;
         e.identity = 99;
         e.in_player_area = 1;
-        e.perm = perm;
+        e.perm = 1;
         e.url = item.icon;
         e.is_dynamic = 0;
         e.height = 162;
@@ -158,41 +163,28 @@ function buildCommData(emos) {
     return emo;
 }
 
+const oldPush = self.webpackChunklive_room.push;
 
-ah.proxy({
-    onResponse: (response, handler) => {
-        if (response.config.url.includes("api.live.bilibili.com/xlive/web-ucenter/v2/emoticon/GetEmoticons")) {
-            let json1 = JSON.parse(response.response);
-            if (window.preloadJson.data != null) {
-                //遍历所有权利
-                let locked = true;
-                let emojis = [];
-                for (const right of window.preloadJson.data.rights) {
-                    //遍历权利列表
-                    for (const right1 of right.right_list) {
-                        //检查有没有解锁
-                        if (right1.right_type == "medal") {
-                            if (locked) {
-                                locked = right1.locked;
-                            }
-                        }
-                        //表情
-                        else if (right1.right_type == "emote") {
-                            emojis = right1.list;
-                        }
-                    }
-                }
-                if (emojis) {
-                    let upEmo = buildData(emojis, locked ? 0 : 1);
-                    json1.data.data.splice(3, 0, upEmo);
-                }
-            }
+self.webpackChunklive_room.push = function (chunk) {
+    const modules = chunk[1];
 
-            response.response = JSON.stringify(json1);
-            handler.next(response)
-        } else {
-            handler.next(response)
+    for (const id in modules) {
+        if (!modules.hasOwnProperty(id)) continue;
+
+        if (id == 1649) {
+            const orig = modules[id];
+
+            modules[id] = function (t, e, r) {
+                let source = orig.toString();
+                const targetStr = "this.emoticonsList=n.data||[]";
+                const newStr = '(function(data){if(window.preloadEmoji){const protoPkg=data[0];const myPkg=Object.assign(Object.create(Object.getPrototypeOf(protoPkg)),protoPkg);myPkg.current_cover=window.preloadEmoji.current_cover;myPkg.pkg_descript="充电表情";myPkg.pkg_id=1;myPkg.pkg_name="充电表情";myPkg.pkg_perm=1;myPkg.pkg_type=5;myPkg.recently_used_emoticons=[];const protoEmoji=myPkg.emoticons[0];myPkg.emoticons=[];for(const emoji of window.preloadEmoji.emoticons){const myEmoji=Object.assign(Object.create(Object.getPrototypeOf(protoEmoji)),protoEmoji);myEmoji.bulge_display=1;myEmoji.descript=emoji.descript;myEmoji.emoji=emoji.emoji;myEmoji.emoticon_id=emoji.emoticon_id;myEmoji.emoticon_unique=emoji.emoticon_unique;myEmoji.emoticon_value_type=emoji.emoticon_value_type;myEmoji.height=emoji.height;myEmoji.identity=emoji.identity;myEmoji.in_player_area=emoji.in_player_area;myEmoji.is_dynamic=emoji.is_dynamic;myEmoji.url=emoji.url;myEmoji.width=emoji.width;myPkg.emoticons.push(myEmoji)}data.splice(3,0,myPkg)}})(n.data),';
+                if (source.includes(targetStr)) {
+                    source = source.replace(targetStr, newStr + targetStr);
+                }
+                const patchedFunc = new Function('t', 'e', 'r', `(${source})(t, e, r)`);
+                return patchedFunc(t, e, r);
+            };
         }
     }
-})
-
+    return oldPush.apply(this, arguments);
+};
