@@ -4,29 +4,35 @@ const originalFetch = window.fetch;
 
 window.fetch = async function (resource, options) {
     const response = await originalFetch(resource, options);
-    let responseText;
 
-    const clonedResponse = response.clone();
-    responseText = await clonedResponse.text();
-    if (resource.includes("api.bilibili.com/x/emote/user/panel/web")) {
-        const active = document.activeElement;
-        if (active.tagName === "BILI-COMMENTS") {
+    const url = resource instanceof Request ? resource.url : resource.toString();
 
-            if (window.preloadCommEmoji) {
-                const json1 = JSON.parse(responseText);
-                console.warn(json1)
-                json1.data.packages.splice(4, 0, window.preloadCommEmoji);
+    if (url.includes("api.bilibili.com/x/emote/user/panel/web")) {
+        try {
+            const clonedResponse = response.clone();
+            let responseText = await clonedResponse.text();
 
-                responseText = JSON.stringify(json1);
+            const active = document.activeElement;
+            if (active && active.tagName === "BILI-COMMENTS") {
+                if (window.preloadCommEmoji) {
+                    const json1 = JSON.parse(responseText);
+                    if (json1.data && json1.data.packages) {
+                        json1.data.packages.splice(4, 0, window.preloadCommEmoji);
+                    }
+                    responseText = JSON.stringify(json1);
+                }
             }
+
+            return new Response(responseText, {
+                status: response.status,
+                statusText: response.statusText,
+                headers: response.headers
+            });
+        } catch (e) {
+            return response;
         }
     }
-
-    return new Response(responseText, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: response.headers
-    });
+    return response;
 };
 
 (function () {

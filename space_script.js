@@ -2,26 +2,41 @@ const originalFetch = window.fetch;
 
 window.fetch = async function (resource, options) {
     const response = await originalFetch(resource, options);
-    let responseText;
 
-    const clonedResponse = response.clone();
-    responseText = await clonedResponse.text();
-    if (resource.includes("api.bilibili.com/x/emote/user/panel/web")) {
-        const active = document.activeElement;
-        if (active.tagName === "BILI-COMMENTS") {
-            if (window.preloadCommEmoji) {
-                const json1 = JSON.parse(responseText);
-                json1.data.packages.splice(4, 0, window.preloadCommEmoji);
-                responseText = JSON.stringify(json1);
-            }
-        }
+    const url = (resource instanceof Request ? resource.url : resource).toString();
+
+    if (!url.includes("api.bilibili.com/x/emote/user/panel/web")) {
+        return response;
     }
 
-    return new Response(responseText, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: response.headers
-    });
+    try {
+        const clonedResponse = response.clone();
+        let responseText = await clonedResponse.text();
+
+        const active = document.activeElement;
+        if (active && active.tagName === "BILI-COMMENTS") {
+            if (window.preloadCommEmoji) {
+                try {
+                    const json1 = JSON.parse(responseText);
+                    // 确保数据结构存在，防止报错
+                    if (json1 && json1.data && json1.data.packages) {
+                        json1.data.packages.splice(4, 0, window.preloadCommEmoji);
+                        responseText = JSON.stringify(json1);
+                    }
+                } catch (parseError) {
+                }
+            }
+        }
+
+        return new Response(responseText, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: response.headers
+        });
+
+    } catch (e) {
+        return response;
+    }
 };
 
 (async function () {

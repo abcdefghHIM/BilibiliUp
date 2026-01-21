@@ -1,27 +1,36 @@
 const originalFetch = window.fetch;
 
 window.fetch = async function (resource, options) {
-    const response = await originalFetch(resource, options);
-    let responseText;
+    const url = typeof resource === 'string' ? resource : (resource.url || "");
 
-    const clonedResponse = response.clone();
-    responseText = await clonedResponse.text();
-    if (resource.includes("api.bilibili.com/x/emote/user/panel/web")) {
-        const active = document.activeElement;
-        if (active.tagName === "BILI-COMMENTS") {
-            if (window.preloadCommEmoji) {
-                const json1 = JSON.parse(responseText);
-                json1.data.packages.splice(4, 0, window.preloadCommEmoji);
-                responseText = JSON.stringify(json1);
+    if (url.includes("api.bilibili.com/x/emote/user/panel/web")) {
+        try {
+            const response = await originalFetch(resource, options);
+            const clonedResponse = response.clone();
+            let responseText = await clonedResponse.text();
+
+            const active = document.activeElement;
+            if (active && active.tagName === "BILI-COMMENTS") {
+                if (window.preloadCommEmoji) {
+                    const json1 = JSON.parse(responseText);
+                    if (json1 && json1.data && json1.data.packages) {
+                        json1.data.packages.splice(4, 0, window.preloadCommEmoji);
+                        responseText = JSON.stringify(json1);
+                    }
+                }
             }
+
+            return new Response(responseText, {
+                status: response.status,
+                statusText: response.statusText,
+                headers: response.headers
+            });
+        } catch (err) {
+            return originalFetch(resource, options);
         }
     }
 
-    return new Response(responseText, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: response.headers
-    });
+    return originalFetch(resource, options);
 };
 
 (async function () {
