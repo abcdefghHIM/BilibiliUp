@@ -66,10 +66,14 @@ window.fetch = async function (resource, options) {
                             }
                         }
                     }
-                    if (!locked) {
-                        window.preloadEmoji = buildData(emojis);
-                        window.preloadCommEmoji = buildCommData(emojis);
+                    if (emojis.length != 0) {
+                        window.preloadEmoji = buildData(emojis, locked ? 0 : 1);
+                        if (!locked) {
+
+                            window.preloadCommEmoji = buildCommData(emojis);
+                        }
                     }
+
                 }
             });
     }
@@ -77,7 +81,7 @@ window.fetch = async function (resource, options) {
     preloadExtraData();
 })();
 
-function buildData(emos) {
+function buildData(emos, perm) {
     let emo = {};
     emo.current_cover = emos[0].icon;
     emo.pkg_descript = "充电表情";
@@ -108,7 +112,7 @@ function buildData(emos) {
         e.emoticon_value_type = 1;
         e.identity = 99;
         e.in_player_area = 1;
-        e.perm = 1;
+        e.perm = perm;
         e.url = item.icon;
         e.is_dynamic = 0;
         e.height = 162;
@@ -183,7 +187,7 @@ self.webpackChunklive_room.push = function (chunk) {
             modules[id] = function (t, e, r) {
                 let source = orig.toString();
                 const targetStr = "this.emoticonsList=n.data||[]";
-                const newStr = '(function(data){if(window.preloadEmoji){const protoPkg=data[0];const myPkg=Object.assign(Object.create(Object.getPrototypeOf(protoPkg)),protoPkg);myPkg.current_cover=window.preloadEmoji.current_cover;myPkg.pkg_descript="充电表情";myPkg.pkg_id=1;myPkg.pkg_name="充电表情";myPkg.pkg_perm=1;myPkg.pkg_type=5;myPkg.recently_used_emoticons=[];const protoEmoji=myPkg.emoticons[0];myPkg.emoticons=[];for(const emoji of window.preloadEmoji.emoticons){const myEmoji=Object.assign(Object.create(Object.getPrototypeOf(protoEmoji)),protoEmoji);myEmoji.bulge_display=1;myEmoji.descript=emoji.descript;myEmoji.emoji=emoji.emoji;myEmoji.emoticon_id=emoji.emoticon_id;myEmoji.emoticon_unique=emoji.emoticon_unique;myEmoji.emoticon_value_type=emoji.emoticon_value_type;myEmoji.height=emoji.height;myEmoji.identity=emoji.identity;myEmoji.in_player_area=emoji.in_player_area;myEmoji.is_dynamic=emoji.is_dynamic;myEmoji.url=emoji.url;myEmoji.width=emoji.width;myPkg.emoticons.push(myEmoji)}data.splice(3,0,myPkg)}})(n.data),';
+                const newStr = '(function(data){if(window.preloadEmoji){const protoPkg=data[0];const myPkg=Object.assign(Object.create(Object.getPrototypeOf(protoPkg)),protoPkg);myPkg.current_cover=window.preloadEmoji.current_cover;myPkg.pkg_descript="充电表情";myPkg.pkg_id=1;myPkg.pkg_name="充电表情";myPkg.pkg_perm=1;myPkg.pkg_type=5;myPkg.recently_used_emoticons=[];const protoEmoji=myPkg.emoticons[0];myPkg.emoticons=[];for(const emoji of window.preloadEmoji.emoticons){const myEmoji=Object.assign(Object.create(Object.getPrototypeOf(protoEmoji)),protoEmoji);myEmoji.bulge_display=1;myEmoji.descript=emoji.descript;myEmoji.emoji=emoji.emoji;myEmoji.emoticon_id=emoji.emoticon_id;myEmoji.emoticon_unique=emoji.emoticon_unique;myEmoji.emoticon_value_type=emoji.emoticon_value_type;myEmoji.height=emoji.height;myEmoji.identity=emoji.identity;myEmoji.in_player_area=emoji.in_player_area;myEmoji.is_dynamic=emoji.is_dynamic;myEmoji.perm=emoji.perm;myEmoji.url=emoji.url;myEmoji.width=emoji.width;myPkg.emoticons.push(myEmoji)}data.splice(3,0,myPkg)}})(n.data),';
                 if (source.includes(targetStr)) {
                     source = source.replace(targetStr, newStr + targetStr);
                 }
