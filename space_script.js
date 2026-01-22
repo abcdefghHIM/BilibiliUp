@@ -1,6 +1,6 @@
 (async function () {
+    const core = window.EmojiEnhancerCore;
     try {
-        const core = window.EmojiEnhancerCore;
         core.setupInterceptor();
     }
     catch (err) { return; }

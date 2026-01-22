@@ -1,6 +1,6 @@
 (async function () {
+    const core = window.EmojiEnhancerCore;
     try {
-        const core = window.EmojiEnhancerCore;
         core.setupInterceptor();
     }
     catch (err) { return; }
@@ -80,6 +80,8 @@
         };
     };
 
+    patchWebpack();
+
     const buildLiveData = (emos, mid, perm) => {
         if (!Array.isArray(emos) || emos.length === 0) return null;
 
@@ -134,5 +136,5 @@
         return core.baseBuildData(emos, mid);
     });
 
-    patchWebpack();
+
 })();
