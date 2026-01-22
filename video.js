@@ -1,13 +1,48 @@
 function loadScript(url) {
     return new Promise((resolve, reject) => {
-        var s = document.createElement('script');
+        if (!url) {
+            reject(new Error('loadScript: url is empty'));
+            return;
+        }
+
+        const parent = document.head || document.documentElement;
+        if (!parent) {
+            reject(new Error('loadScript: document not ready'));
+            return;
+        }
+
+        const s = document.createElement('script');
         s.src = url;
-        s.onload = () => { s.remove(); resolve(); };
-        s.onerror = reject;
-        (document.head || document.documentElement).appendChild(s);
+        s.async = false;
+
+        const cleanup = () => {
+            s.onload = null;
+            s.onerror = null;
+            s.remove();
+        };
+
+        s.onload = () => {
+            cleanup();
+            resolve();
+        };
+
+        s.onerror = () => {
+            cleanup();
+            reject(new Error(`Failed to load script: ${url}`));
+        };
+
+        parent.appendChild(s);
     });
 }
 
 (async () => {
-    await loadScript(chrome.runtime.getURL('video_script.js'));
+    try {
+        if (!chrome?.runtime?.getURL) {
+            throw new Error('Not in Chrome extension context');
+        }
+
+        await loadScript(chrome.runtime.getURL('video_script.js'));
+    } catch (e) {
+        console.error(e);
+    }
 })();

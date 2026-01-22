@@ -1,130 +1,151 @@
-const originalFetch = window.fetch;
+(function () {
+    'use strict';
 
-window.fetch = async function (resource, options) {
-    const response = await originalFetch(resource, options);
+    let cachedPreloadEmoji = null;
 
-    const url = (resource instanceof Request ? resource.url : resource).toString();
+    const originalFetch = window.fetch;
+    if (typeof originalFetch !== 'function') return;
 
-    if (!url.includes("api.bilibili.com/x/emote/user/panel/web")) {
-        return response;
-    }
+    window.fetch = async function (resource, options) {
+        const url = typeof resource === 'string' ? resource : (resource.url || "");
 
-    try {
-        const clonedResponse = response.clone();
-        let responseText = await clonedResponse.text();
+        if (!url.includes("api.bilibili.com/x/emote/user/panel/web")) {
+            return originalFetch.apply(this, arguments);
+        }
 
-        const active = document.activeElement;
-        if (active && active.tagName === "BILI-COMMENTS") {
-            if (window.preloadCommEmoji) {
+        try {
+            const response = await originalFetch.apply(this, arguments);
+            if (!cachedPreloadEmoji || !response.ok) return response;
+
+            const clonedResponse = response.clone();
+            let responseText = await clonedResponse.text();
+
+            const active = document.activeElement;
+            const isCommentBox = active && (active.tagName === "BILI-COMMENTS" || active.closest('bili-comments'));
+
+            if (isCommentBox) {
                 try {
-                    const json1 = JSON.parse(responseText);
-                    // 确保数据结构存在，防止报错
-                    if (json1 && json1.data && json1.data.packages) {
-                        json1.data.packages.splice(4, 0, window.preloadCommEmoji);
-                        responseText = JSON.stringify(json1);
+                    const json = JSON.parse(responseText);
+                    if (json?.data?.packages) {
+                        const insertIndex = Math.min(4, json.data.packages.length);
+                        json.data.packages.splice(insertIndex, 0, cachedPreloadEmoji);
+                        responseText = JSON.stringify(json);
                     }
-                } catch (parseError) {
-                }
+                } catch (e) { }
             }
+
+            return new Response(responseText, {
+                status: response.status,
+                statusText: response.statusText,
+                headers: response.headers
+            });
+
+        } catch (err) {
+            return originalFetch.apply(this, arguments);
         }
+    };
 
-        return new Response(responseText, {
-            status: response.status,
-            statusText: response.statusText,
-            headers: response.headers
-        });
-
-    } catch (e) {
-        return response;
-    }
-};
-
-(async function () {
-    const url = new URL(window.location.href);
-    const pathSegments = url.pathname.split('/');
-    const data = await loadExtraData(pathSegments[1]);
-    if (data.data != null) {
-        let locked = true;
-        let emojis = [];
-        for (const right of data.data.rights) {
-            //遍历权利列表
-            for (const right1 of right.right_list) {
-                //检查有没有解锁
-                if (right1.right_type == "medal") {
-                    if (locked) {
-                        locked = right1.locked;
-                    }
-                }
-                //表情
-                else if (right1.right_type == "emote") {
-                    emojis = right1.list;
-                }
-            }
+    const getUid = () => {
+        try {
+            const url = new URL(window.location.href);
+            const pathSegments = url.pathname.split('/');
+            const mid = pathSegments[1];
+            return mid;
+        } catch (e) {
+            return null;
         }
-        if (!locked) {
-            window.preloadCommEmoji = buildData(emojis)
-        }
-    }
-})();
+    };
 
-function buildData(emos) {
-    let emo = {};
-    emo.attr = 2;
-    emo.flags = {};
-    emo.flags.added = true;
-    emo.flags.preview = true;
-    emo.id = 1;
-    emo.label = null;
-    emo.meta = {};
-    emo.meta.size = 1;
-    emo.meta.item_id = 0;
-    emo.mtime = 1756886863;
-    emo.package_sub_title = "";
-    emo.ref_mid = 0;
-    emo.resource_type = 0;
-    emo.text = "充电表情";
-    emo.type = 1;
-    emo.url = emos[0].icon;
+    const getCsrf = () => {
+        const match = document.cookie.match(/bili_jct=([^;]+)/);
+        return match ? match[1] : "";
+    };
 
-    emo.emote = [];
-    for (const item of emos) {
-        let e = {};
-        e.activity = null;
-        e.attr = 0;
-        e.flags = {};
-        e.flags.unlocked = false;
-        e.id = item.id;
-        e.meta = {};
-        e.meta.size = 2;
-        e.meta.alias = item.name;
-        e.mtime = 1756886863;
-        e.package_id = 0;
-        e.text = "[UPOWER_" + window.injectVariable + "_" + item.name + "]";
-        e.type = 3;
-        e.url = item.icon;
+    const buildData = (emos, mid, isLocked) => {
+        if (!Array.isArray(emos) || emos.length === 0) return null;
 
-        emo.emote.push(e);
+        const timestamp = Math.floor(Date.now() / 1000);
+
+        const emo = {
+            attr: 2,
+            flags: { added: true, preview: true },
+            id: 1,
+            label: null,
+            meta: { size: 1, item_id: 0 },
+            mtime: timestamp,
+            package_sub_title: "",
+            ref_mid: 0,
+            resource_type: 0,
+            text: "充电表情",
+            type: 1,
+            url: emos[0].icon,
+            emote: emos.map(item => ({
+                activity: null,
+                attr: 0,
+                flags: { unlocked: isLocked },
+                id: item.id,
+                meta: { size: 2, alias: item.name },
+                mtime: timestamp,
+                package_id: 0,
+                text: `[UPOWER_${mid}_${item.name}]`,
+                type: 3,
+                url: item.icon
+            }))
+        };
+
+        return emo;
     }
 
-    return emo;
-}
+    const loadExtraData = async (mid) => {
+        const csrf = getCsrf();
+        if (!csrf || !mid) return null;
 
-async function loadExtraData(mid) {
-    let bili_jct = (document.cookie.match(/bili_jct=([^;]+)/) || [])[1] || "";
-    if (!bili_jct) return;
-
-    try {
-        const resp = await originalFetch(
-            "https://api.bilibili.com/x/upowerv2/gw/rights/guide?csrf=" + encodeURIComponent(bili_jct) + "&up_mid=" + mid,
-            {
+        try {
+            const url = `https://api.bilibili.com/x/upowerv2/gw/rights/guide?csrf=${encodeURIComponent(csrf)}&up_mid=${mid}`;
+            const resp = await originalFetch(url, {
                 method: "GET",
                 credentials: "include"
-            }
-        );
-        const data = await resp.clone().json();
-        return data;
-    } catch (err) {
-        console.error("加载额外数据失败:", err);
-        return null;
+            });
+            if (!resp.ok) return null;
+            return await resp.json();
+        } catch (err) {
+            console.error("[EmojiEnhancer] 加载额外数据失败:", err);
+            return null;
+        }
     }
-}
+
+    const init = async () => {
+        try {
+            const mid = getUid();
+
+            if (!mid) return;
+
+            const res = await loadExtraData(mid);
+            if (res?.data?.rights) {
+                let isLocked = true;
+                let rawEmojis = [];
+
+                // 遍历权限列表
+                for (const right of res.data.rights) {
+                    for (const item of (right.right_list || [])) {
+                        if (item.right_type === "medal") {
+                            if (isLocked) {
+                                isLocked = !!item.locked;
+                            }
+                        } else if (item.right_type === "emote") {
+                            rawEmojis = item.list || [];
+                        }
+                    }
+                }
+
+                if (rawEmojis.length > 0) {
+                    cachedPreloadEmoji = buildData(rawEmojis, mid, isLocked);
+                }
+            }
+        } catch (err) {
+            console.error("[EmojiEnhancer] 初始化失败:", err);
+        }
+    };
+
+    init();
+})();
