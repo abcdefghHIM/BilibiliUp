@@ -7,45 +7,59 @@
     if (typeof originalFetch !== 'function') return;
 
     window.fetch = async function (resource, options) {
-        const url = typeof resource === 'string' ? resource : (resource?.url || "");
+        let url = "";
+        try {
+            if (typeof resource === "string") url = resource;
+            else if (resource instanceof Request) url = resource.url;
+        } catch { }
 
         // 仅拦截表情包面板接口
         if (!url.includes("api.bilibili.com/x/emote/user/panel/web")) {
-            return originalFetch(resource, options);
+            return originalFetch.apply(this, arguments);
         }
 
         try {
             const response = await originalFetch(resource, options);
-            if (!response.ok) return response;
+            if (!cachedPreloadEmoji || !response.ok) return response;
+
+            const ct = response.headers.get("content-type") || "";
+            if (!ct.includes("application/json")) return response;
 
             const clonedResponse = response.clone();
             let responseText = await clonedResponse.text();
 
-            // 检查当前是否在评论区操作
             const active = document.activeElement;
-            if (active?.tagName === "BILI-COMMENTS" && cachedPreloadEmoji) {
+            let isCommentBox = false;
+            try {
+                isCommentBox = !!(
+                    active &&
+                    (active.tagName?.toUpperCase() === "BILI-COMMENTS" ||
+                        active.closest?.("bili-comments"))
+                );
+            } catch { }
+
+            if (isCommentBox) {
                 try {
                     const json = JSON.parse(responseText);
-                    if (json?.data?.packages && Array.isArray(json.data.packages)) {
-                        // 安全插入：如果长度不足则 push，否则 splice
-                        const insertIndex = Math.min(json.data.packages.length, 4);
+                    if (json?.data?.packages) {
+                        const insertIndex = Math.min(4, json.data.packages.length);
                         json.data.packages.splice(insertIndex, 0, cachedPreloadEmoji);
                         responseText = JSON.stringify(json);
                     }
-                } catch (parseError) {
-                    console.warn("[Script] 表情包 JSON 解析失败", parseError);
-                }
+                } catch (e) { }
             }
+
+            const headers = new Headers(response.headers);
+            headers.delete("content-length");
 
             return new Response(responseText, {
                 status: response.status,
                 statusText: response.statusText,
-                headers: response.headers
+                headers
             });
 
         } catch (err) {
-            console.error("[Script] Fetch 拦截器错误:", err);
-            return originalFetch(resource, options); // 保底机制：出错则返回原始请求
+            return originalFetch.apply(this, arguments);
         }
     };
 
@@ -110,7 +124,7 @@
         return emo;
     }
 
-    const buildCommData = (emos, mid, isLocked) => {
+    const buildCommData = (emos, mid) => {
         if (!Array.isArray(emos) || emos.length === 0) return null;
 
         const timestamp = Math.floor(Date.now() / 1000);
@@ -131,7 +145,7 @@
             emote: emos.map(item => ({
                 activity: null,
                 attr: 0,
-                flags: { unlocked: isLocked },
+                flags: { unlocked: true },
                 id: item.id,
                 meta: { size: 2, alias: item.name },
                 mtime: timestamp,
@@ -262,7 +276,9 @@
 
                 if (rawEmojis.length > 0) {
                     window.preloadEmoji = buildData(rawEmojis, mid, isLocked ? 0 : 1);
-                    cachedPreloadEmoji = buildCommData(rawEmojis, mid, isLocked);
+                    if (!isLocked) {
+                        cachedPreloadEmoji = buildCommData(rawEmojis, mid);
+                    }
                 }
             }
         } catch (err) { }

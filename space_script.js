@@ -7,7 +7,11 @@
     if (typeof originalFetch !== 'function') return;
 
     window.fetch = async function (resource, options) {
-        const url = typeof resource === 'string' ? resource : (resource.url || "");
+        let url = "";
+        try {
+            if (typeof resource === "string") url = resource;
+            else if (resource instanceof Request) url = resource.url;
+        } catch { }
 
         if (!url.includes("api.bilibili.com/x/emote/user/panel/web")) {
             return originalFetch.apply(this, arguments);
@@ -17,11 +21,21 @@
             const response = await originalFetch.apply(this, arguments);
             if (!cachedPreloadEmoji || !response.ok) return response;
 
+            const ct = response.headers.get("content-type") || "";
+            if (!ct.includes("application/json")) return response;
+
             const clonedResponse = response.clone();
             let responseText = await clonedResponse.text();
 
             const active = document.activeElement;
-            const isCommentBox = active && (active.tagName === "BILI-COMMENTS" || active.closest('bili-comments'));
+            let isCommentBox = false;
+            try {
+                isCommentBox = !!(
+                    active &&
+                    (active.tagName?.toUpperCase() === "BILI-COMMENTS" ||
+                        active.closest?.("bili-comments"))
+                );
+            } catch { }
 
             if (isCommentBox) {
                 try {
@@ -34,10 +48,13 @@
                 } catch (e) { }
             }
 
+            const headers = new Headers(response.headers);
+            headers.delete("content-length");
+
             return new Response(responseText, {
                 status: response.status,
                 statusText: response.statusText,
-                headers: response.headers
+                headers
             });
 
         } catch (err) {
@@ -61,7 +78,7 @@
         return match ? match[1] : "";
     };
 
-    const buildData = (emos, mid, isLocked) => {
+    const buildData = (emos, mid) => {
         if (!Array.isArray(emos) || emos.length === 0) return null;
 
         const timestamp = Math.floor(Date.now() / 1000);
@@ -82,7 +99,7 @@
             emote: emos.map(item => ({
                 activity: null,
                 attr: 0,
-                flags: { unlocked: isLocked },
+                flags: { unlocked: true },
                 id: item.id,
                 meta: { size: 2, alias: item.name },
                 mtime: timestamp,
@@ -138,8 +155,8 @@
                     }
                 }
 
-                if (rawEmojis.length > 0) {
-                    cachedPreloadEmoji = buildData(rawEmojis, mid, isLocked);
+                if (!isLocked && rawEmojis.length > 0) {
+                    cachedPreloadEmoji = buildData(rawEmojis, mid);
                 }
             }
         } catch (err) {
