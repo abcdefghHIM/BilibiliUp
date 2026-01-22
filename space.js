@@ -41,6 +41,7 @@ function loadScript(url) {
             throw new Error('Not in Chrome extension context');
         }
 
+        await loadScript(chrome.runtime.getURL('core.js'));
         await loadScript(chrome.runtime.getURL('space_script.js'));
     } catch (e) {
         console.error(e);
