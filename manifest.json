@@ -21,7 +21,8 @@
         },
         {
             "matches": [
-                "https://space.bilibili.com/*"
+                "https://space.bilibili.com/*",
+                "https://www.bilibili.com/opus/*"
             ],
             "js": [
                 "space.js"
@@ -52,7 +53,8 @@
                 "space_script.js"
             ],
             "matches": [
-                "https://space.bilibili.com/*"
+                "https://space.bilibili.com/*",
+                "https://www.bilibili.com/*"
             ]
         },
         {

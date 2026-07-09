@@ -31,6 +31,7 @@
             xhr.onreadystatechange = function () {
                 if (xhr.readyState === 4) {
                     try {
+                        if (!window.preloadEmoji) return;
                         const json = JSON.parse(xhr.responseText);
                         const insertIndex = Math.min(3, json.data.data.length);
                         json.data.data.splice(insertIndex, 0, window.preloadEmoji);
@@ -53,84 +54,84 @@
 
     let isSuccess = false;
 
-//     const patchWebpack = () => {
-//         if (!self.webpackChunklive_room) return;
+    //     const patchWebpack = () => {
+    //         if (!self.webpackChunklive_room) return;
 
-//         const oldPush = self.webpackChunklive_room.push;
+    //         const oldPush = self.webpackChunklive_room.push;
 
-//         self.webpackChunklive_room.push = function (chunk) {
-//             const modules = chunk[1];
-//             for (const id in modules) {
-//                 if (!modules.hasOwnProperty(id)) continue;
+    //         self.webpackChunklive_room.push = function (chunk) {
+    //             const modules = chunk[1];
+    //             for (const id in modules) {
+    //                 if (!modules.hasOwnProperty(id)) continue;
 
-//                 const originalModule = modules[id];
-//                 const source = originalModule.toString();
+    //                 const originalModule = modules[id];
+    //                 const source = originalModule.toString();
 
-//                 const match = source.match(/this\.emoticonsList\s*=\s*([a-zA-Z0-9_$]+)\.data\s*\|\|\s*\[\]/);
-//                 if (match) {
-//                     const objName = match[1];
-//                     modules[id] = function (t, e, r) {
-//                         let source = originalModule.toString();
-//                         const targetStr = match[0];
+    //                 const match = source.match(/this\.emoticonsList\s*=\s*([a-zA-Z0-9_$]+)\.data\s*\|\|\s*\[\]/);
+    //                 if (match) {
+    //                     const objName = match[1];
+    //                     modules[id] = function (t, e, r) {
+    //                         let source = originalModule.toString();
+    //                         const targetStr = match[0];
 
-//                         const injectLogic = `(function (data) {
-//     if (window.preloadEmoji) {
-//         try {
-//             const protoPkg = data[0];
-//             const myPkg = Object.assign(Object.create(Object.getPrototypeOf(protoPkg)), protoPkg);
+    //                         const injectLogic = `(function (data) {
+    //     if (window.preloadEmoji) {
+    //         try {
+    //             const protoPkg = data[0];
+    //             const myPkg = Object.assign(Object.create(Object.getPrototypeOf(protoPkg)), protoPkg);
 
-//             myPkg.current_cover = window.preloadEmoji.current_cover;
-//             myPkg.pkg_descript = "充电表情";
-//             myPkg.pkg_id = 1;
-//             myPkg.pkg_name = "充电表情";
-//             myPkg.pkg_perm = 1;
-//             myPkg.pkg_type = 5;
-//             myPkg.recently_used_emoticons = [];
+    //             myPkg.current_cover = window.preloadEmoji.current_cover;
+    //             myPkg.pkg_descript = "充电表情";
+    //             myPkg.pkg_id = 1;
+    //             myPkg.pkg_name = "充电表情";
+    //             myPkg.pkg_perm = 1;
+    //             myPkg.pkg_type = 5;
+    //             myPkg.recently_used_emoticons = [];
 
-//             const protoEmoji = myPkg.emoticons[0];
+    //             const protoEmoji = myPkg.emoticons[0];
 
-//             myPkg.emoticons = [];
+    //             myPkg.emoticons = [];
 
-//             for (const emoji of window.preloadEmoji.emoticons) {
-//                 const myEmoji = Object.assign(Object.create(Object.getPrototypeOf(protoEmoji)), protoEmoji);
-//                 myEmoji.bulge_display = 1;
-//                 myEmoji.descript = emoji.descript;
-//                 myEmoji.emoji = emoji.emoji;
-//                 myEmoji.emoticon_id = emoji.emoticon_id;
-//                 myEmoji.emoticon_unique = emoji.emoticon_unique;
-//                 myEmoji.emoticon_value_type = emoji.emoticon_value_type;
-//                 myEmoji.height = emoji.height;
-//                 myEmoji.identity = emoji.identity;
-//                 myEmoji.in_player_area = emoji.in_player_area;
-//                 myEmoji.is_dynamic = emoji.is_dynamic;
-//                 myEmoji.perm = emoji.perm;
-//                 myEmoji.url = emoji.url;
-//                 myEmoji.width = emoji.width;
-//                 myPkg.emoticons.push(myEmoji);
-//             }
+    //             for (const emoji of window.preloadEmoji.emoticons) {
+    //                 const myEmoji = Object.assign(Object.create(Object.getPrototypeOf(protoEmoji)), protoEmoji);
+    //                 myEmoji.bulge_display = 1;
+    //                 myEmoji.descript = emoji.descript;
+    //                 myEmoji.emoji = emoji.emoji;
+    //                 myEmoji.emoticon_id = emoji.emoticon_id;
+    //                 myEmoji.emoticon_unique = emoji.emoticon_unique;
+    //                 myEmoji.emoticon_value_type = emoji.emoticon_value_type;
+    //                 myEmoji.height = emoji.height;
+    //                 myEmoji.identity = emoji.identity;
+    //                 myEmoji.in_player_area = emoji.in_player_area;
+    //                 myEmoji.is_dynamic = emoji.is_dynamic;
+    //                 myEmoji.perm = emoji.perm;
+    //                 myEmoji.url = emoji.url;
+    //                 myEmoji.width = emoji.width;
+    //                 myPkg.emoticons.push(myEmoji);
+    //             }
 
-//             data.splice(Math.min(data.length, 3), 0, myPkg);
-//         }
-//         catch (err) {
+    //             data.splice(Math.min(data.length, 3), 0, myPkg);
+    //         }
+    //         catch (err) {
 
-//         }
+    //         }
 
-//     }
-// })(${objName}.data),`;
+    //     }
+    // })(${objName}.data),`;
 
-//                         source = source.replace(targetStr, injectLogic + targetStr);
+    //                         source = source.replace(targetStr, injectLogic + targetStr);
 
-//                         return new Function('t', 'e', 'r', `(${source})(t, e, r)`)(t, e, r);
-//                     };
+    //                         return new Function('t', 'e', 'r', `(${source})(t, e, r)`)(t, e, r);
+    //                     };
 
-//                     isSuccess = true;
-//                 }
-//             }
-//             return oldPush.apply(this, arguments);
-//         };
-//     };
+    //                     isSuccess = true;
+    //                 }
+    //             }
+    //             return oldPush.apply(this, arguments);
+    //         };
+    //     };
 
-//     patchWebpack();
+    //     patchWebpack();
 
     // 没替换成功，走网络拦截器
     if (!isSuccess) {
