@@ -5,83 +5,138 @@
     }
     catch (err) { return; }
 
+    //直播间单独走一个拦截器
+    const EMOTE_API_PATH = "api.live.bilibili.com/xlive/web-ucenter/v2/emoticon/GetEmoticons";
 
-    const patchWebpack = () => {
-        if (!self.webpackChunklive_room) return;
+    const setupInterceptor = () => {
+        if (typeof XMLHttpRequest !== 'function') return;
 
-        const oldPush = self.webpackChunklive_room.push;
+        const originalOpen = XMLHttpRequest.prototype.open;
+        const originalSend = XMLHttpRequest.prototype.send;
 
-        self.webpackChunklive_room.push = function (chunk) {
-            const modules = chunk[1];
-            for (const id in modules) {
-                if (!modules.hasOwnProperty(id)) continue;
+        XMLHttpRequest.prototype.open = function (method, url) {
+            this.__emoteUrl = typeof url === 'string' ? url : String(url);
+            return originalOpen.apply(this, arguments);
+        };
 
-                const originalModule = modules[id];
-                const source = originalModule.toString();
+        XMLHttpRequest.prototype.send = function (...args) {
+            const xhr = this;
+            const url = xhr.__emoteUrl;
 
-                const match = source.match(/this\.emoticonsList\s*=\s*([a-zA-Z0-9_$]+)\.data\s*\|\|\s*\[\]/);
-                if (match) {
-                    const objName = match[1];
-                    modules[id] = function (t, e, r) {
-                        let source = originalModule.toString();
-                        const targetStr = match[0];
-
-                        const injectLogic = `(function (data) {
-    if (window.preloadEmoji) {
-        try {
-            const protoPkg = data[0];
-            const myPkg = Object.assign(Object.create(Object.getPrototypeOf(protoPkg)), protoPkg);
-
-            myPkg.current_cover = window.preloadEmoji.current_cover;
-            myPkg.pkg_descript = "充电表情";
-            myPkg.pkg_id = 1;
-            myPkg.pkg_name = "充电表情";
-            myPkg.pkg_perm = 1;
-            myPkg.pkg_type = 5;
-            myPkg.recently_used_emoticons = [];
-
-            const protoEmoji = myPkg.emoticons[0];
-
-            myPkg.emoticons = [];
-
-            for (const emoji of window.preloadEmoji.emoticons) {
-                const myEmoji = Object.assign(Object.create(Object.getPrototypeOf(protoEmoji)), protoEmoji);
-                myEmoji.bulge_display = 1;
-                myEmoji.descript = emoji.descript;
-                myEmoji.emoji = emoji.emoji;
-                myEmoji.emoticon_id = emoji.emoticon_id;
-                myEmoji.emoticon_unique = emoji.emoticon_unique;
-                myEmoji.emoticon_value_type = emoji.emoticon_value_type;
-                myEmoji.height = emoji.height;
-                myEmoji.identity = emoji.identity;
-                myEmoji.in_player_area = emoji.in_player_area;
-                myEmoji.is_dynamic = emoji.is_dynamic;
-                myEmoji.perm = emoji.perm;
-                myEmoji.url = emoji.url;
-                myEmoji.width = emoji.width;
-                myPkg.emoticons.push(myEmoji);
+            if (!url || !url.includes(EMOTE_API_PATH)) {
+                return originalSend.apply(this, args);
             }
 
-            data.splice(Math.min(data.length, 3), 0, myPkg);
-        }
-        catch (err) {
-
-        }
-
-    }
-})(${objName}.data),`;
-
-                        source = source.replace(targetStr, injectLogic + targetStr);
-
-                        return new Function('t', 'e', 'r', `(${source})(t, e, r)`)(t, e, r);
-                    };
+            const originalOnReadyStateChange = xhr.onreadystatechange;
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === 4) {
+                    try {
+                        const json = JSON.parse(xhr.responseText);
+                        const insertIndex = Math.min(3, json.data.data.length);
+                        json.data.data.splice(insertIndex, 0, window.preloadEmoji);
+                        const modifiedText = JSON.stringify(json);
+                        Object.defineProperty(xhr, 'responseText', {
+                            get: () => modifiedText
+                        });
+                    } catch (e) {
+                        console.warn("直播间表情包响应解析失败", e);
+                    }
                 }
-            }
-            return oldPush.apply(this, arguments);
+                if (typeof originalOnReadyStateChange === 'function') {
+                    return originalOnReadyStateChange.apply(xhr, arguments);
+                }
+            };
+
+            return originalSend.apply(this, args);
         };
     };
 
-    patchWebpack();
+    let isSuccess = false;
+
+//     const patchWebpack = () => {
+//         if (!self.webpackChunklive_room) return;
+
+//         const oldPush = self.webpackChunklive_room.push;
+
+//         self.webpackChunklive_room.push = function (chunk) {
+//             const modules = chunk[1];
+//             for (const id in modules) {
+//                 if (!modules.hasOwnProperty(id)) continue;
+
+//                 const originalModule = modules[id];
+//                 const source = originalModule.toString();
+
+//                 const match = source.match(/this\.emoticonsList\s*=\s*([a-zA-Z0-9_$]+)\.data\s*\|\|\s*\[\]/);
+//                 if (match) {
+//                     const objName = match[1];
+//                     modules[id] = function (t, e, r) {
+//                         let source = originalModule.toString();
+//                         const targetStr = match[0];
+
+//                         const injectLogic = `(function (data) {
+//     if (window.preloadEmoji) {
+//         try {
+//             const protoPkg = data[0];
+//             const myPkg = Object.assign(Object.create(Object.getPrototypeOf(protoPkg)), protoPkg);
+
+//             myPkg.current_cover = window.preloadEmoji.current_cover;
+//             myPkg.pkg_descript = "充电表情";
+//             myPkg.pkg_id = 1;
+//             myPkg.pkg_name = "充电表情";
+//             myPkg.pkg_perm = 1;
+//             myPkg.pkg_type = 5;
+//             myPkg.recently_used_emoticons = [];
+
+//             const protoEmoji = myPkg.emoticons[0];
+
+//             myPkg.emoticons = [];
+
+//             for (const emoji of window.preloadEmoji.emoticons) {
+//                 const myEmoji = Object.assign(Object.create(Object.getPrototypeOf(protoEmoji)), protoEmoji);
+//                 myEmoji.bulge_display = 1;
+//                 myEmoji.descript = emoji.descript;
+//                 myEmoji.emoji = emoji.emoji;
+//                 myEmoji.emoticon_id = emoji.emoticon_id;
+//                 myEmoji.emoticon_unique = emoji.emoticon_unique;
+//                 myEmoji.emoticon_value_type = emoji.emoticon_value_type;
+//                 myEmoji.height = emoji.height;
+//                 myEmoji.identity = emoji.identity;
+//                 myEmoji.in_player_area = emoji.in_player_area;
+//                 myEmoji.is_dynamic = emoji.is_dynamic;
+//                 myEmoji.perm = emoji.perm;
+//                 myEmoji.url = emoji.url;
+//                 myEmoji.width = emoji.width;
+//                 myPkg.emoticons.push(myEmoji);
+//             }
+
+//             data.splice(Math.min(data.length, 3), 0, myPkg);
+//         }
+//         catch (err) {
+
+//         }
+
+//     }
+// })(${objName}.data),`;
+
+//                         source = source.replace(targetStr, injectLogic + targetStr);
+
+//                         return new Function('t', 'e', 'r', `(${source})(t, e, r)`)(t, e, r);
+//                     };
+
+//                     isSuccess = true;
+//                 }
+//             }
+//             return oldPush.apply(this, arguments);
+//         };
+//     };
+
+//     patchWebpack();
+
+    // 没替换成功，走网络拦截器
+    if (!isSuccess) {
+        // console.warn("未能成功替换webpack模块，尝试使用XHR拦截器");
+        setupInterceptor();
+    }
 
     const buildLiveData = (emos, mid, perm) => {
         if (!Array.isArray(emos) || emos.length === 0) return null;
@@ -128,7 +183,7 @@
 
             recently_used_emoticons: []
         };
-    }
+    };
 
     const mid = window.__NEPTUNE_IS_MY_WAIFU__?.roomInfoRes?.data?.room_info?.uid;
     if (!mid) return;
